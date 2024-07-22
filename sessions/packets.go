@@ -25,32 +25,36 @@ func StartSendingPackets() {
 
 	go func() {
 		for {
-			packetMutex.Lock()
+			select {
+			case <-time.After(time.Millisecond * 16):
+				packetMutex.Lock()
 
-			for user, packets := range packetQueue {
-				// The user's session has been fully closed, so we can stop sending packets to them.
-				if user.SessionClosed {
-					delete(packetQueue, user)
-					continue
-				}
-
-				var packetsFailed []interface{}
-
-				// Try to send packets, and update the packets that failed to send to try again
-				for _, packet := range packets {
-					err := SendPacketToConnection(packet, user.Conn)
-
-					if err != nil {
-						packetsFailed = append(packetsFailed, packet)
+				for user, packets := range packetQueue {
+					// The user's session has been fully closed, so we can stop sending packets to them.
+					if user.SessionClosed {
+						delete(packetQueue, user)
+						packetMutex.Unlock()
+						continue
 					}
+
+					var packetsFailed []interface{}
+
+					// Try to send packets, and update the packets that failed to send to try again
+					for _, packet := range packets {
+						err := SendPacketToConnection(packet, user.Conn)
+
+						if err != nil {
+							packetsFailed = append(packetsFailed, packet)
+						}
+					}
+
+					packetQueue[user] = packetsFailed
 				}
 
-				packetQueue[user] = packetsFailed
+				packetMutex.Unlock()
 			}
-
-			packetMutex.Unlock()
-			time.Sleep(time.Millisecond * 10)
 		}
+
 	}()
 }
 
