@@ -181,7 +181,7 @@ func (u *User) SetLastTemporaryDisconnectionTimestamp(lastTemporaryDisconnection
 	u.lastTemporaryDisconnectionTimestamp = lastTemporaryDisconnectionTimestamp
 }
 
-// Returns if the user is temporarily disconnected
+// IsTempDisconnected Returns if the user is temporarily disconnected
 func (u *User) IsTempDisconnected() bool {
 	u.Mutex.Lock()
 	defer u.Mutex.Unlock()
