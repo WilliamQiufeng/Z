@@ -181,6 +181,14 @@ func (u *User) SetLastTemporaryDisconnectionTimestamp(lastTemporaryDisconnection
 	u.lastTemporaryDisconnectionTimestamp = lastTemporaryDisconnectionTimestamp
 }
 
+// Returns if the user is temporarily disconnected
+func (u *User) IsTempDisconnected() bool {
+	u.Mutex.Lock()
+	defer u.Mutex.Unlock()
+
+	return u.lastTemporaryDisconnectionTimestamp != -1
+}
+
 // GetLastDetectedProcesses Gets the last detected processes for the user
 func (u *User) GetLastDetectedProcesses() []string {
 	u.Mutex.Lock()

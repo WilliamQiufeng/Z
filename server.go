@@ -149,40 +149,42 @@ func clearPreviousSessions() {
 func startBackgroundWorker() {
 	go func() {
 		for {
-			users := sessions.GetOnlineUsers()
+			select {
+			case <-time.After(time.Millisecond * 500):
+				users := sessions.GetOnlineUsers()
 
-			for _, user := range users {
-				// Disregard bot users
-				if common.HasUserGroup(user.Info.UserGroups, common.UserGroupBot) {
-					continue
-				}
+				for _, user := range users {
+					// Disregard bot users
+					if common.HasUserGroup(user.Info.UserGroups, common.UserGroupBot) {
+						continue
+					}
 
-				// Clear user's chat spam rate
-				if time.Now().UnixMilli()-user.GetSpammedChatLastTimeCleared() >= 10_000 {
-					user.ResetSpammedMessagesCount()
-					user.SetSpammedChatLastTimeCleared(time.Now().UnixMilli())
-				}
+					// Clear user's chat spam rate
+					if time.Now().UnixMilli()-user.GetSpammedChatLastTimeCleared() >= 10_000 {
+						user.ResetSpammedMessagesCount()
+						user.SetSpammedChatLastTimeCleared(time.Now().UnixMilli())
+					}
 
-				// Ping the user periodically
-				if time.Now().UnixMilli()-user.GetLastPingTimestamp() >= 40_000 {
-					sessions.SendPacketToUser(packets.NewServerPing(), user)
-					user.SetLastPingTimestamp()
-				}
+					// Ping the user periodically
+					if time.Now().UnixMilli()-user.GetLastPingTimestamp() >= 40_000 {
+						sessions.SendPacketToUser(packets.NewServerPing(), user)
+						user.SetLastPingTimestamp()
+					}
 
-				if user.GetLastTemporaryDisconnectionTimestamp() != -1 &&
-					(time.Now().UnixMilli()-user.GetLastTemporaryDisconnectionTimestamp()) >= 10_000 {
-					_ = handlers.HandleLogout(user.Conn, false)
-					log.Printf("[%v - %v] Disconnected due to not reconnecting after temporary disconnection\n", user.Info.Username, user.Info.Id)
-				}
+					timeDisconnected := time.Now().UnixMilli() - user.GetLastTemporaryDisconnectionTimestamp()
 
-				// User hasn't responded to pings in a while, so disconnect them
-				if time.Now().UnixMilli()-user.GetLastPongTimestamp() >= 120_000 {
-					utils.CloseConnection(user.Conn)
-					log.Printf("[%v - %v] Disconnected due to being unresponsive to pings (timeout)\n", user.Info.Username, user.Info.Id)
+					if user.IsTempDisconnected() && timeDisconnected >= 10_000 {
+						_ = handlers.HandleLogout(user.Conn, false)
+						log.Printf("[%v - %v] Disconnected due to not reconnecting after temp disconnect\n", user.Info.Username, user.Info.Id)
+					}
+
+					// User hasn't responded to pings in a while, so disconnect them
+					if !user.IsTempDisconnected() && time.Now().UnixMilli()-user.GetLastPongTimestamp() >= 120_000 {
+						utils.CloseConnection(user.Conn)
+						log.Printf("[%v - %v] User timed out\n", user.Info.Username, user.Info.Id)
+					}
 				}
 			}
-
-			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 }
