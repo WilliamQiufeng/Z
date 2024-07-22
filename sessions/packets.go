@@ -32,14 +32,12 @@ func StartSendingPackets() {
 				for user, packets := range packetQueue {
 					// User is currently disconnected, so skip
 					if user.IsTempDisconnected() {
-						packetMutex.Unlock()
 						continue
 					}
 
 					// The user's session has been fully closed, so we can stop sending packets to them.
 					if user.SessionClosed {
 						delete(packetQueue, user)
-						packetMutex.Unlock()
 						continue
 					}
 
